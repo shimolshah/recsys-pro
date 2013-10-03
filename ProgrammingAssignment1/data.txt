@@ -1,0 +1,4 @@
+Your inputs for Programming Assignment 1 are:
+329
+197
+1894
