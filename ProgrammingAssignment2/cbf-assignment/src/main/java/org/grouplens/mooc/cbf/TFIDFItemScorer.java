@@ -52,13 +52,15 @@ public class TFIDFItemScorer extends AbstractItemScorer {
             // Score the item represented by 'e'.
             // Get the item vector for this item
             SparseVector iv = model.getItemVector(e.getKey());
-            // TODO Compute the cosine of this item and the user's profile, store it in the output vector
-            // TODO And remove this exception to say you've implemented it
-            throw new UnsupportedOperationException("stub implementation");
+            //----- // Compute the cosine of this item and the user's profile, store it in the output vector
+            double score = userVector.dot(iv)/(userVector.norm()*iv.norm());
+            output.set(e.getKey(), score);
+            //----- // And remove this exception to say you've implemented it
+            //throw new UnsupportedOperationException("stub implementation");
         }
     }
 
-    private SparseVector makeUserVector(long user) {
+    private SparseVector makeUserVector1(long user) {
         // Get the user's ratings
         List<Rating> userRatings = dao.getEventsForUser(user, Rating.class);
         if (userRatings == null) {
@@ -79,7 +81,9 @@ public class TFIDFItemScorer extends AbstractItemScorer {
             // preferences to express the user unrating an item
             if (p != null && p.getValue() >= 3.5) {
                 // The user likes this item!
-                // TODO Get the item's vector and add it to the user's profile
+                //----- // Get the item's vector and add it to the user's profile
+            	SparseVector iv = model.getItemVector(r.getItemId());
+            	profile.add(iv);
             }
         }
 
@@ -87,4 +91,43 @@ public class TFIDFItemScorer extends AbstractItemScorer {
         // It is good practice to return a frozen vector.
         return profile.freeze();
     }
+    
+    private SparseVector makeUserVector(long user) {
+        // Get the user's ratings
+        List<Rating> userRatings = dao.getEventsForUser(user, Rating.class);
+        if (userRatings == null) {
+            // the user doesn't exist
+            return SparseVector.empty();
+        }
+
+        // Create a new vector over tags to accumulate the user profile
+        MutableSparseVector profile = model.newTagVector();
+        // Fill it with 0's initially - they don't like anything
+        profile.fill(0);
+
+        //Calculate mean user rating
+        double average_rating = 0;
+        for (Rating r: userRatings) {
+        	average_rating += r.getPreference().getValue();
+        }
+        average_rating/=userRatings.size();
+        
+        // Iterate over the user's ratings to build their profile
+        for (Rating r: userRatings) {
+            // In LensKit, ratings are expressions of preference
+            Preference p = r.getPreference();
+            // We'll never have a null preference. But in LensKit, ratings can have null
+            // preferences to express the user unrating an item
+            
+            SparseVector iv = model.getItemVector(r.getItemId());
+            MutableSparseVector score_vector = iv.mutableCopy();
+            score_vector.multiply(p.getValue()-average_rating);
+            profile.add(score_vector);
+        }
+
+        // The profile is accumulated, return it.
+        // It is good practice to return a frozen vector.
+        return profile.freeze();
+    }
+
 }
